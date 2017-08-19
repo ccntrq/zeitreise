@@ -34,4 +34,4 @@ rebasing.
 ## Planned Features:
 
 - rewrite only commits where it is required
-- try to optain as much of the history as possible
+- try to obtain as much of the history as possible
