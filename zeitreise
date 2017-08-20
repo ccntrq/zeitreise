@@ -23,7 +23,7 @@ sub zeitreise($onto) {
     # set editor.
     # this editor will mark all commits for 'edit'
     my $oldEditor =
-      setEnv( 'GIT_SEQUENCE_EDITOR', $FindBin::Bin . '/zeitreise_editor edit' );
+      setEnv( 'GIT_SEQUENCE_EDITOR', $FindBin::Bin . '/zeitreise_editor' );
     my $out = gitExec( 'rebase', '-i', $onto );
 
     modifyLoop();
@@ -50,15 +50,12 @@ sub modifyCommit {
     my $date = `date`;
     chomp $date;
 
-    my $oldEditor =
-      setEnv( 'GIT_EDITOR', $FindBin::Bin . '/zeitreise_editor noop' );
     my $old_date = setEnv( 'GIT_COMMITTER_DATE', $date );
 
-    my $out = gitExec( 'commit', '--amend', '--date', "'$date'", '-a' );
+    my $out =
+      gitExec( 'commit', '--amend', '--date', "'$date'", '-a', '--no-edit' );
 
-    setEnv( 'GIT_EDITOR',         $oldEditor );
     setEnv( 'GIT_COMMITTER_DATE', $old_date );
-
 }
 
 sub setEnv ( $key, $value ) {

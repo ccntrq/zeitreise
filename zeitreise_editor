@@ -6,33 +6,17 @@ use strict;
 use warnings;
 no warnings 'experimental::signatures';
 
+###########################################################################
+# Mark all commits in the given file for editing.
+###########################################################################
 run(@ARGV);
 
 exit 0;
 
 ## subs
 
-sub run ( $mode, $location = undef ) {
-    my @modes = qw(edit noop);
-
-    die "mode '$mode' is not supported. supported are: '"
-      . join( ', ', @modes ) . "'!"
-      if !grep /$mode/, @modes;
-
-    ###########################################################################
-    # Mark all commits in the given file for editing.
-    ###########################################################################
-    if ( $mode eq 'edit' ) {
-        spurt( editContent( slurp($location) ), $location );
-    }
-    ###########################################################################
-    # Do nothing...
-    ###########################################################################
-    elsif ( $mode eq 'noop' ) {
-
-        # do i really need to do this?
-        spurt( slurp($location), $location );
-    }
+sub run ( $location) {
+    spurt( editContent( slurp($location) ), $location );
 }
 
 # This will mark all commit in a rebase commit list for 'edit'
