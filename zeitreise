@@ -7,13 +7,11 @@ use warnings;
 no warnings 'experimental::signatures';
 
 use FindBin;
+use IPC::Open3;
+use Symbol;
+use IO::Select;
 
 my ($onto) = @ARGV;
-
-# my $out = `git rebase $onto`;
-
-# say $out;
-
 zeitreise($onto);
 
 exit 1;
@@ -27,7 +25,6 @@ sub zeitreise($onto) {
     my $oldEditor =
       setEnv( 'GIT_SEQUENCE_EDITOR', $FindBin::Bin . '/zeitreise_editor edit' );
     my $out = gitExec( 'rebase', '-i', $onto );
-    say $out;
 
     modifyLoop();
 
@@ -44,7 +41,6 @@ sub modifyLoop {
     sleep 1;    # to get a different timestamp for each commit
 
     my $out = gitExec( 'rebase', '--continue' );
-    print $out;
 
     modifyLoop();
 }
@@ -59,7 +55,6 @@ sub modifyCommit {
     my $old_date = setEnv( 'GIT_COMMITTER_DATE', $date );
 
     my $out = gitExec( 'commit', '--amend', '--date', "'$date'", '-a' );
-    print $out;
 
     setEnv( 'GIT_EDITOR',         $oldEditor );
     setEnv( 'GIT_COMMITTER_DATE', $old_date );
@@ -117,6 +112,35 @@ sub gitExec ( $cmd, @args ) {
       if !grep /$cmd/, @supportedCmds;
 
     my $fullCmd = "git $cmd " . ( scalar @args ? join( ' ', @args ) : '' );
-    say $fullCmd;
-    return `$fullCmd`;
+
+    my ( $inH, $outH, $errH );
+    $errH = gensym();
+
+    my $gitPid = open3( $inH, $outH, $errH, $fullCmd )
+      or die "failed to execute: $!";
+
+    my $sel = IO::Select->new();
+    $sel->add( $outH, $errH );
+
+    my ( $out, $err );
+    while ( my @ready = $sel->can_read ) {
+        for my $fh (@ready) {
+            my $line = <$fh>;
+            if ( !defined $line ) {    # EOF
+                $sel->remove($fh);
+                next;
+            }
+            if ( $fh == $outH ) {
+                $out .= $line;
+            }
+            elsif ( $fh == $errH ) {
+                $err .= $line;
+            }
+            else {
+                die "How did we get here?";
+            }
+        }
+    }
+
+    return $out;
 }
