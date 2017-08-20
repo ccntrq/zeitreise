@@ -64,6 +64,63 @@ sub setEnv ( $key, $value ) {
     return $old;
 }
 
+sub getCommitInfo($onto) {
+
+    # this will probably break gits '--root' option for now
+    # should be easily fixable later on
+    my $out = gitExec( 'log', '--pretty=fuller', "$onto..HEAD" );
+
+    return logParser($out);
+}
+
+sub logParser($log) {
+
+    # we need
+    # - commitId (commit)
+    # - AuthorDate
+    # - CommitDate
+    # - position
+
+    my @out = reverse( split( "\n", $log ) );
+
+    my @commitInfo;
+    while ( scalar @out ) {
+        my @munched = munch_message_and_whitespace(@out);
+        my ( $info, @rest ) = extractCommitInfo(@munched);
+
+        push @commitInfo, $info;
+        @out = @rest;
+    }
+
+    return \@commitInfo;
+}
+
+sub extractCommitInfo(@lines) {
+    return {} if !scalar @lines;
+
+    my $res = {};
+    $res->{CommitDate} = $lines[0];
+    $res->{AuthorDate} = $lines[2];
+    $res->{CommitID}   = $lines[4];
+
+    # remove 'names' from the values
+    $res->{$_} =~ s/^\S*\s// for keys %{$res};
+
+    @lines = @lines[ 5 .. $#lines ];
+    return ( $res, @lines );
+}
+
+sub munch_message_and_whitespace (@lines) {
+    return () if !scalar @lines;
+
+    my ( $line, @rest ) = @lines;
+    if ( !length $line || $line =~ /^\s+/ ) {
+        return munch_message_and_whitespace(@rest);
+    }
+
+    return ( $line, @rest );
+}
+
 sub checkStatus {
 
     my $out = gitExec('status');
@@ -102,7 +159,7 @@ sub statusParser($status) {
 }
 
 sub gitExec ( $cmd, @args ) {
-    my @supportedCmds = qw(status rebase commit);
+    my @supportedCmds = qw(status rebase commit log);
 
     die "command '$cmd' is not supported. supported are: '"
       . join( ', ', @supportedCmds ) . "'!"
@@ -137,6 +194,15 @@ sub gitExec ( $cmd, @args ) {
                 die "How did we get here?";
             }
         }
+    }
+
+    waitpid( $gitPid, 0 );
+    my $exit_status = $? >> 8;
+    if ( $exit_status != 0 ) {
+        say STDERR "ExitStatus: $exit_status";
+        say STDERR "GitERR: $err" if $err;
+        say STDERR "GitOUT: $out" if $out;
+        die "FUCK";
     }
 
     return $out;
