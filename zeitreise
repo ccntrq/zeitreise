@@ -7,9 +7,13 @@ use warnings;
 no warnings 'experimental::signatures';
 
 use FindBin;
-use IPC::Open3;
-use Symbol;
 use IO::Select;
+use IPC::Open3;
+use Symbol 'gensym';
+
+# from the cpan
+use DateTime;
+use DateTime::Format::DateParse;
 
 my ($onto) = @ARGV;
 zeitreise($onto);
@@ -20,36 +24,35 @@ sub zeitreise($onto) {
 
     die "need 'onto'" unless length $onto;
 
+    my $history = getCommitInfo($onto);
+
     # set editor.
     # this editor will mark all commits for 'edit'
     my $oldEditor =
       setEnv( 'GIT_SEQUENCE_EDITOR', $FindBin::Bin . '/zeitreise_editor' );
     my $out = gitExec( 'rebase', '-i', $onto );
 
-    modifyLoop();
+
+    modifyLoop(@$history);
 
     setEnv( 'GIT_SEQUENCE_EDITOR', $oldEditor );
 
     return 1;
 }
 
-sub modifyLoop {
+sub modifyLoop (@history) {
     my $status = checkStatus();
     return if $status->{status} ne 'rebasing';
 
-    modifyCommit();
-    sleep 1;    # to get a different timestamp for each commit
+    my $cur = shift @history;
+    modifyCommit( $cur->{AuthorDate} );
 
     my $out = gitExec( 'rebase', '--continue' );
 
-    modifyLoop();
+    modifyLoop(@history);
 }
 
-sub modifyCommit {
-
-    my $date = `date`;
-    chomp $date;
-
+sub modifyCommit($date) {
     my $old_date = setEnv( 'GIT_COMMITTER_DATE', $date );
 
     my $out =
@@ -64,13 +67,27 @@ sub setEnv ( $key, $value ) {
     return $old;
 }
 
+sub sortHistory($commitInfo) {
+
+    my @commitInfo = map {
+        $_->{date} =
+          DateTime::Format::DateParse->parse_datetime( $_->{AuthorDate} );
+          $_;
+    } @$commitInfo;
+    @commitInfo =
+      sort { DateTime->compare( $a->{date}, $b->{date} ); } @commitInfo;
+    return \@commitInfo;
+
+}
+
 sub getCommitInfo($onto) {
 
     # this will probably break gits '--root' option for now
     # should be easily fixable later on
     my $out = gitExec( 'log', '--pretty=fuller', "$onto..HEAD" );
 
-    return logParser($out);
+    my $info = logParser($out);
+    return sortHistory($info);
 }
 
 sub logParser($log) {
@@ -202,7 +219,7 @@ sub gitExec ( $cmd, @args ) {
         say STDERR "ExitStatus: $exit_status";
         say STDERR "GitERR: $err" if $err;
         say STDERR "GitOUT: $out" if $out;
-        die "FUCK";
+        die "Oh noez!";
     }
 
     return $out;
