@@ -2,7 +2,7 @@
 
 Make your commits go on a zeitreise
 
-I like to rebase branches alot for a clean commit history. When you reorder your
+I like to rebase branches a lot for a clean commit history. When you reorder your
 commits like this they seem to appear in a weird order in some UIs. I always get
 confused by this and have to look up the output of `git log` on my terminal.
 This tool helps rebasing a branch and rewriting the commit timestamps in a way
@@ -22,16 +22,22 @@ Afterwards you can use this tool to align the timestamps with the commit order.
 ./zeitreise master
 ```
 
-This will take at least N seconds where N is the number of commits you are
-rebasing.
+This will order the AuthorDate timestamps of all commits you are rebasing
+chronologically and apply them to the commits in this order.
 
 # Status
 
 ## Version
 
-0.0.1
+0.0.2
 
-## Planned Features:
+## Requirements
 
-- rewrite only commits where it is required
-- try to obtain as much of the history as possible
+perl v5.20
+
+From the `cpan`:
+
+- DateTime
+- DateTime::Format::DateParse
+
+
